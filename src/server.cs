@@ -6,12 +6,13 @@ using System.Threading.Tasks;
 using System.Text;
 using System.Net.Http;
 using System.Linq;
+using LobbyAnnouncer;
 
 namespace Server;
 
 public class LobbyState
 {
-    public readonly int Id = new Random().Next(10000000, 99999999);
+    public readonly int Id;
 
     public string Name = "Default";
     public int Players;
@@ -50,7 +51,25 @@ public class LobbyState
         return found;
     }
 
-    public static string ToJSON(LobbyState state)
+    public static void UpdateLobbyPLayers(int count, LobbyState lobby)
+    {
+        lobby.Players += count;
+        if(lobby.Players < 0)
+        {
+            lobby.Players = 0;
+            ModPlugin.Logger.LogDebug("Lobby player count went below 0, resetting to 0.");
+            return;
+        }
+
+        if(lobby.Players > lobby.MaxPlayers)
+        {
+            ModPlugin.Logger.LogDebug("Lobby player count went above max players, resetting to max players.");
+        }
+
+        POST.UpdateLobby(lobby);
+    }
+
+    public static string OpenAndJSON(LobbyState state)
     {
         string modsJson = state.Mods is { Count: > 0 }
                         ? "[\"" + string.Join("\", \"", state.Mods) + "\"]"
@@ -63,6 +82,17 @@ public class LobbyState
             "players": {{state.Players}},
             "maxPlayers": {{state.MaxPlayers}},
             "mods": {{modsJson}}
+        }
+        """;
+    }
+
+    public static string UpdateAndJSON(LobbyState state)
+    {
+        return $$"""
+        {
+            "event": "{{LobbyEvent.update}}",
+            "lobbyId": "{{state.Id}}",
+            "players": {{state.Players}}
         }
         """;
     }
@@ -96,42 +126,31 @@ public class POST
 
     public static void StartLobby(LobbyState state)
     {
-        Task.Run(async () =>
-        {
-            try
-            {
-                using var request = new HttpRequestMessage(HttpMethod.Post, ServerUrl)
-                {
-                    Content = new StringContent(LobbyState.ToJSON(state), Encoding.UTF8, "application/json")
-                };
-
-                using var response = await client.SendAsync(request);
-
-            }
-            catch (Exception ex)
-            {
-                LobbyAnnouncer.ModPlugin.Logger.LogDebug("Error sending lobby state: " + ex.Message);
-            }
-        });
+        if (state == null) return;
+        Send(LobbyState.OpenAndJSON(state));
     }
 
     public static void UpdateLobby(LobbyState state)
     {
-        // TODO: IMplement this later
+        if (state == null) return;
+        Send(LobbyState.UpdateAndJSON(state));
     }
 
     public static void CloseLobby(LobbyState state)
     {
         if (state == null) return;
-        
+        Send(LobbyState.CloseAndJSON(state));
+    }
+
+    private static void Send(string json)
+    {
         Task.Run(async () =>
         {
-
             try
             {
                 using var request = new HttpRequestMessage(HttpMethod.Post, ServerUrl)
                 {
-                    Content = new StringContent(LobbyState.CloseAndJSON(state), Encoding.UTF8, "application/json")
+                    Content = new StringContent(json, Encoding.UTF8, "application/json")
                 };
 
                 using var response = await client.SendAsync(request);

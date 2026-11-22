@@ -43,16 +43,27 @@ public class ModPlugin : BaseUnityPlugin
         try
         {
             
-            // 1. Busca CreateLobby sea pública o privada
             new Hook(
                 typeof(LobbyCreateMenu).GetMethod("CreateLobby", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic),
                 typeof(ModPlugin).GetMethod(nameof(ModPlugin.MakingLobbyNotify), BindingFlags.Static | BindingFlags.Public)
             );
-            // 2. Busca LeaveLobby
+
             new Hook(
                 typeof(OnlineManager).GetMethod(nameof(OnlineManager.LeaveLobby), BindingFlags.Static | BindingFlags.Public),
                 typeof(ModPlugin).GetMethod(nameof(ModPlugin.CloseLobbyNotify), BindingFlags.Static | BindingFlags.Public)
             );
+
+            new Hook(
+                typeof(Lobby).GetMethod("NewParticipant", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic),
+                typeof(ModPlugin).GetMethod(nameof(ModPlugin.PlayerJoinedNotify), BindingFlags.Static | BindingFlags.Public)
+            );
+
+            new Hook(
+                typeof(Lobby).GetMethod("ParticipantLeftImpl", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic),
+                typeof(ModPlugin).GetMethod(nameof(ModPlugin.PlayerLeftNotify), BindingFlags.Static | BindingFlags.Public)
+            );
+
+
 
         }
         catch (Exception e)
@@ -74,7 +85,7 @@ public class ModPlugin : BaseUnityPlugin
 
         lobbyState = new Server.LobbyState
         {
-            Name = "idk seko", //player name
+            Name = OnlineManager.mePlayer.id.DisplayName,
             Mods = Server.LobbyState.DetectMods(),
             Players = 1, // the host is alone when starting the lobby
             MaxPlayers = self.maxPlayerCount,
@@ -99,5 +110,21 @@ public class ModPlugin : BaseUnityPlugin
     {
         Server.POST.CloseLobby(lobbyState);
         Logger.LogDebug("Closing lobby in application quit");
+    }
+
+       private static void PlayerLeftNotify(Action<Lobby, OnlinePlayer> orig, Lobby self, OnlinePlayer player)
+    {
+        orig(self, player);
+        if (lobbyState == null) return;
+        Server.LobbyState.UpdateLobbyPLayers(-1, lobbyState);
+    }
+
+    private static void PlayerJoinedNotify(Action<Lobby, OnlinePlayer> orig , Lobby self, OnlinePlayer player)
+    {
+        orig(self, player);
+
+        if (!self.isOwner) return;
+        if (lobbyState == null) return;
+        Server.LobbyState.UpdateLobbyPLayers(1, lobbyState);
     }
 }

@@ -89,18 +89,18 @@ async def handle_lobby(request: web.Request) -> web.Response:
 
     if event == LobbyEvent.OPEN:
         id = await bot.makeLobby(generateLobby(JSON))
-        print(f"Lobby {id} opened")
+        log.info(f"Lobby {id} opened")
         return web.json_response({"ok": True, "id": id})
 
     if event == LobbyEvent.CLOSE:
         await bot.closeLobby(JSON.get("lobbyId"))
-        print(f"Lobby {JSON.get('lobbyId')}")
+        log.info(f"Lobby {JSON.get('lobbyId')} closed")
         return web.json_response({"ok": True})
 
     if event == LobbyEvent.UPDATE:
         id, players = JSON.get("lobbyId"), JSON.get("players")
         await bot.updateLobby(id, players)
-        print(f"Lobby {id} updated: {players} players")
+        log.info(f"Lobby {id} updated: {players} players")
         return web.json_response({"ok": True})
 
 

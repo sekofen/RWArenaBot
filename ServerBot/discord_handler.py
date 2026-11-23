@@ -32,7 +32,7 @@ def buildMsg(lobby: LobbyState) -> discord.Embed:
 
     embed = discord.Embed(
         title=name,
-        description=f"**{players}/{max_players}** | `{"█" * players + "─" * (max_players - players)}` ",
+        description=f"**{players}/{max_players}** | `{"█" * players + "─" * min(10, (max_players - players))}` ",
         color=COLOR_FULL if full else COLOR_OPEN,
         timestamp=discord.utils.utcnow(),
     )
